@@ -1,26 +1,27 @@
-"use client"
+'use client'
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
-import { Button } from "@/components/ui/button"
-import { Plus, Trash2 } from "lucide-react"
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { Button } from '@/components/ui/button'
+import { HugeiconsIcon } from '@hugeicons/react'
+import { Add01Icon, Delete02Icon, File01Icon } from '@hugeicons/core-free-icons'
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
-import { createMonthlyRecord } from "@/app/actions"
+} from '@/components/ui/select'
+import { createMonthlyRecord } from '@/app/actions'
 
 type Product = {
   id: number
@@ -28,8 +29,8 @@ type Product = {
 }
 
 const months = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
 ]
 
 const currentYear = new Date().getFullYear()
@@ -38,17 +39,17 @@ const years = Array.from({ length: 5 }, (_, i) => currentYear - i)
 export function AddEntryDialog({ products }: { products: Product[] }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
-  const [productId, setProductId] = useState("")
-  const [month, setMonth] = useState("")
+  const [productId, setProductId] = useState('')
+  const [month, setMonth] = useState('')
   const [year, setYear] = useState(String(currentYear))
-  const [revenue, setRevenue] = useState("")
+  const [revenue, setRevenue] = useState('')
   const [expenseItems, setExpenseItems] = useState([
-    { serviceName: "", amount: "" },
+    { serviceName: '', amount: '' },
   ])
   const [saving, setSaving] = useState(false)
 
   const addExpenseRow = () => {
-    setExpenseItems([...expenseItems, { serviceName: "", amount: "" }])
+    setExpenseItems([...expenseItems, { serviceName: '', amount: '' }])
   }
 
   const removeExpenseRow = (index: number) => {
@@ -57,7 +58,7 @@ export function AddEntryDialog({ products }: { products: Product[] }) {
 
   const updateExpense = (
     index: number,
-    field: "serviceName" | "amount",
+    field: 'serviceName' | 'amount',
     value: string
   ) => {
     const updated = [...expenseItems]
@@ -80,11 +81,11 @@ export function AddEntryDialog({ products }: { products: Product[] }) {
     )
     setSaving(false)
     setOpen(false)
-    setProductId("")
-    setMonth("")
+    setProductId('')
+    setMonth('')
     setYear(String(currentYear))
-    setRevenue("")
-    setExpenseItems([{ serviceName: "", amount: "" }])
+    setRevenue('')
+    setExpenseItems([{ serviceName: '', amount: '' }])
     router.refresh()
   }
 
@@ -93,19 +94,24 @@ export function AddEntryDialog({ products }: { products: Product[] }) {
       <DialogTrigger
         render={
           <Button>
-            <Plus className="h-4 w-4 mr-2" />
+            <HugeiconsIcon icon={Add01Icon} className="size-4 mr-2" />
             Add Entry
           </Button>
         }
       />
       <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Add Monthly Entry</DialogTitle>
+          <div className="flex items-center gap-3 mb-1">
+            <div className="flex items-center justify-center size-10 rounded-xl bg-violet-500/10 ring-1 ring-violet-500/20">
+              <HugeiconsIcon icon={File01Icon} className="size-5 text-violet-400" />
+            </div>
+            <DialogTitle>Add Monthly Entry</DialogTitle>
+          </div>
         </DialogHeader>
-        <div className="space-y-4 pt-4">
+        <div className="space-y-5 pt-2">
           <div className="space-y-2">
             <Label>Product</Label>
-            <Select value={productId} onValueChange={(v) => setProductId(v ?? "")}>
+            <Select value={productId} onValueChange={(v) => setProductId(v ?? '')}>
               <SelectTrigger>
                 <SelectValue placeholder="Select product" />
               </SelectTrigger>
@@ -122,7 +128,7 @@ export function AddEntryDialog({ products }: { products: Product[] }) {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Month</Label>
-              <Select value={month} onValueChange={(v) => setMonth(v ?? "")}>
+              <Select value={month} onValueChange={(v) => setMonth(v ?? '')}>
                 <SelectTrigger>
                   <SelectValue placeholder="Month" />
                 </SelectTrigger>
@@ -137,7 +143,7 @@ export function AddEntryDialog({ products }: { products: Product[] }) {
             </div>
             <div className="space-y-2">
               <Label>Year</Label>
-              <Select value={year} onValueChange={(v) => setYear(v ?? "")}>
+              <Select value={year} onValueChange={(v) => setYear(v ?? '')}>
                 <SelectTrigger>
                   <SelectValue placeholder="Year" />
                 </SelectTrigger>
@@ -171,10 +177,11 @@ export function AddEntryDialog({ products }: { products: Product[] }) {
               <Button
                 type="button"
                 variant="outline"
-                size="sm"
+                size="xs"
                 onClick={addExpenseRow}
+                className="text-xs"
               >
-                <Plus className="h-3 w-3 mr-1" />
+                <HugeiconsIcon icon={Add01Icon} className="size-3 mr-1" />
                 Add Cost
               </Button>
             </div>
@@ -185,7 +192,7 @@ export function AddEntryDialog({ products }: { products: Product[] }) {
                   placeholder="Service name"
                   value={item.serviceName}
                   onChange={(e) =>
-                    updateExpense(i, "serviceName", e.target.value)
+                    updateExpense(i, 'serviceName', e.target.value)
                   }
                   className="flex-1"
                 />
@@ -196,7 +203,7 @@ export function AddEntryDialog({ products }: { products: Product[] }) {
                   placeholder="0.00"
                   value={item.amount}
                   onChange={(e) =>
-                    updateExpense(i, "amount", e.target.value)
+                    updateExpense(i, 'amount', e.target.value)
                   }
                   className="w-28"
                 />
@@ -204,10 +211,11 @@ export function AddEntryDialog({ products }: { products: Product[] }) {
                   <Button
                     type="button"
                     variant="ghost"
-                    size="icon"
+                    size="icon-sm"
                     onClick={() => removeExpenseRow(i)}
+                    className="shrink-0 hover:bg-red-500/10 hover:text-red-400"
                   >
-                    <Trash2 className="h-4 w-4 text-muted-foreground" />
+                    <HugeiconsIcon icon={Delete02Icon} className="size-3.5" />
                   </Button>
                 )}
               </div>
@@ -222,7 +230,7 @@ export function AddEntryDialog({ products }: { products: Product[] }) {
               onClick={handleSubmit}
               disabled={saving || !productId || !month || !revenue}
             >
-              {saving ? "Saving..." : "Save Entry"}
+              {saving ? 'Saving...' : 'Save Entry'}
             </Button>
           </div>
         </div>

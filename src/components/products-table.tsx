@@ -1,7 +1,7 @@
-"use client"
+'use client'
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   Table,
   TableBody,
@@ -9,19 +9,20 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table"
-import { Button } from "@/components/ui/button"
-import { Pencil, Trash2 } from "lucide-react"
+} from '@/components/ui/table'
+import { Button } from '@/components/ui/button'
+import { HugeiconsIcon } from '@hugeicons/react'
+import { Edit01Icon, Delete02Icon, PackageIcon } from '@hugeicons/core-free-icons'
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { updateProduct, deleteProduct } from "@/app/actions"
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import { updateProduct, deleteProduct } from '@/app/actions'
 
 type Product = {
   id: number
@@ -32,14 +33,14 @@ type Product = {
 export function ProductsTable({ products }: { products: Product[] }) {
   const router = useRouter()
   const [editing, setEditing] = useState<Product | null>(null)
-  const [editName, setEditName] = useState("")
-  const [editDesc, setEditDesc] = useState("")
+  const [editName, setEditName] = useState('')
+  const [editDesc, setEditDesc] = useState('')
   const [saving, setSaving] = useState(false)
 
   const openEdit = (p: Product) => {
     setEditing(p)
     setEditName(p.name)
-    setEditDesc(p.description ?? "")
+    setEditDesc(p.description ?? '')
   }
 
   const handleSave = async () => {
@@ -58,41 +59,65 @@ export function ProductsTable({ products }: { products: Product[] }) {
 
   return (
     <>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Name</TableHead>
-            <TableHead>Description</TableHead>
-            <TableHead className="w-[100px]">Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {products.map((p) => (
-            <TableRow key={p.id}>
-              <TableCell className="font-medium">{p.name}</TableCell>
-              <TableCell className="text-muted-foreground">
-                {p.description ?? "-"}
-              </TableCell>
-              <TableCell className="flex gap-1">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => openEdit(p)}
-                >
-                  <Pencil className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => handleDelete(p.id)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </TableCell>
+      <div className="rounded-2xl bg-gradient-to-br from-white/[0.03] to-transparent ring-1 ring-white/[0.06] overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow className="border-white/[0.04] hover:bg-transparent">
+              <TableHead className="text-xs uppercase tracking-wider text-muted-foreground pl-6">
+                Product
+              </TableHead>
+              <TableHead className="text-xs uppercase tracking-wider text-muted-foreground">
+                Description
+              </TableHead>
+              <TableHead className="text-xs uppercase tracking-wider text-muted-foreground w-[80px] pr-6">
+                Actions
+              </TableHead>
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+          </TableHeader>
+          <TableBody>
+            {products.map((p) => (
+              <TableRow
+                key={p.id}
+                className="border-white/[0.04] hover:bg-white/[0.02] transition-colors"
+              >
+                <TableCell className="pl-6">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center justify-center size-8 rounded-lg bg-violet-500/10 ring-1 ring-violet-500/10">
+                      <HugeiconsIcon icon={PackageIcon} className="size-4 text-violet-400" />
+                    </div>
+                    <span className="font-medium">{p.name}</span>
+                  </div>
+                </TableCell>
+                <TableCell className="text-muted-foreground">
+                  {p.description ?? (
+                    <span className="text-white/[0.15]">No description</span>
+                  )}
+                </TableCell>
+                <TableCell className="pr-6">
+                  <div className="flex gap-0.5">
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => openEdit(p)}
+                      className="hover:bg-white/[0.06]"
+                    >
+                      <HugeiconsIcon icon={Edit01Icon} className="size-3.5" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => handleDelete(p.id)}
+                      className="hover:bg-red-500/10 hover:text-red-400"
+                    >
+                      <HugeiconsIcon icon={Delete02Icon} className="size-3.5" />
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
 
       <Dialog
         open={!!editing}
@@ -125,8 +150,11 @@ export function ProductsTable({ products }: { products: Product[] }) {
               <Button variant="outline" onClick={() => setEditing(null)}>
                 Cancel
               </Button>
-              <Button onClick={handleSave} disabled={saving || !editName.trim()}>
-                {saving ? "Saving..." : "Save"}
+              <Button
+                onClick={handleSave}
+                disabled={saving || !editName.trim()}
+              >
+                {saving ? 'Saving...' : 'Save Changes'}
               </Button>
             </div>
           </div>
