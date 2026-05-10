@@ -1,36 +1,87 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Cost & Profit Tracker
+
+A lightweight internal web app to manually track monthly maintenance costs and revenues across products, and visualize month-over-month profit margins.
+
+## Tech Stack
+
+- **Framework:** Next.js (App Router)
+- **Language:** TypeScript
+- **Styling:** Tailwind CSS
+- **Database:** Neon (Serverless Postgres)
+- **ORM:** Drizzle ORM
+- **UI:** shadcn/ui
+- **Charts:** Recharts
+- **Package Manager:** pnpm
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+
+- Node.js 18+
+- pnpm
+- A [Neon](https://neon.tech) database
+
+### Setup
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+pnpm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Copy `.env.local` and fill in your Neon connection string:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```
+DATABASE_URL=postgresql://user:password@ep-xxx.us-east-2.aws.neon.tech/dbname?sslmode=require
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Push the database schema:
 
-## Learn More
+```bash
+pnpm db:push
+```
 
-To learn more about Next.js, take a look at the following resources:
+Start the dev server:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+pnpm dev
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Open [http://localhost:3000](http://localhost:3000).
 
-## Deploy on Vercel
+## Features
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- **Dashboard** — Summary cards for current month revenue, costs, and profit, plus a bar chart comparing month-over-month performance.
+- **Products** — Add, edit, and delete the products you track.
+- **Monthly Entries** — Record revenue and multiple cost items per product per month. Profit is calculated automatically.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Database Commands
+
+| Command | Description |
+|---|---|
+| `pnpm db:push` | Push schema directly to database |
+| `pnpm db:generate` | Generate SQL migration files |
+| `pnpm db:migrate` | Apply migrations |
+| `pnpm db:studio` | Open Drizzle Studio |
+
+## Project Structure
+
+```
+src/
+  app/
+    layout.tsx              Root layout with navigation
+    page.tsx                Dashboard page
+    actions.ts              Server actions (CRUD)
+    products/page.tsx       Product management
+    entries/page.tsx        Monthly entry list
+  components/
+    dashboard-chart.tsx     Recharts bar chart
+    add-entry-dialog.tsx    Entry form with dynamic cost items
+    add-product-dialog.tsx  Product creation dialog
+    products-table.tsx      Product list with edit/delete
+    entries-list.tsx        Entry list
+    ui/                     shadcn/ui components
+  db/
+    schema.ts               Drizzle schema definitions
+  lib/
+    db.ts                   Database connection
+    utils.ts                 Utility functions
+```
