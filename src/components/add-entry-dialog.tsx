@@ -19,7 +19,6 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
 } from '@/components/ui/select'
 import { createMonthlyRecord } from '@/app/actions'
 
@@ -113,7 +112,9 @@ export function AddEntryDialog({ products }: { products: Product[] }) {
             <Label>Product</Label>
             <Select value={productId} onValueChange={(v) => setProductId(v ?? '')}>
               <SelectTrigger>
-                <SelectValue placeholder="Select product" />
+                {productId
+                  ? products.find((p) => String(p.id) === productId)?.name
+                  : 'Select product'}
               </SelectTrigger>
               <SelectContent>
                 {products.map((p) => (
@@ -130,7 +131,7 @@ export function AddEntryDialog({ products }: { products: Product[] }) {
               <Label>Month</Label>
               <Select value={month} onValueChange={(v) => setMonth(v ?? '')}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Month" />
+                  {month ? months[Number(month) - 1] : 'Month'}
                 </SelectTrigger>
                 <SelectContent>
                   {months.map((m, i) => (
