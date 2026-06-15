@@ -146,7 +146,7 @@ export function AddEntryDialog({ products }: { products: Product[] }) {
               <Label>Year</Label>
               <Select value={year} onValueChange={(v) => setYear(v ?? '')}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Year" />
+                  {year || 'Year'}
                 </SelectTrigger>
                 <SelectContent>
                   {years.map((y) => (

@@ -84,13 +84,13 @@ export function DashboardChart({ data }: { data: ChartData[] }) {
           dataKey="label"
           axisLine={false}
           tickLine={false}
-          tick={{ fill: 'oklch(0.55 0.01 285)', fontSize: 11, fontFamily: 'var(--font-geist-mono)' }}
+          tick={{ fill: 'oklch(0.55 0.01 285)', fontSize: 11, fontFamily: 'var(--font-jetbrains-mono)' }}
           dy={8}
         />
         <YAxis
           axisLine={false}
           tickLine={false}
-          tick={{ fill: 'oklch(0.55 0.01 285)', fontSize: 11, fontFamily: 'var(--font-geist-mono)' }}
+          tick={{ fill: 'oklch(0.55 0.01 285)', fontSize: 11, fontFamily: 'var(--font-jetbrains-mono)' }}
           tickFormatter={fmt}
           width={60}
         />
