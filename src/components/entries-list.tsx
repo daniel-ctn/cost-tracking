@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Table,
@@ -11,12 +11,20 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+} from '@/components/ui/select'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
   Delete02Icon,
   Edit01Icon,
   PackageIcon,
   ArrowRight01Icon,
+  Search01Icon,
 } from '@hugeicons/core-free-icons'
 import { EntryDialog } from '@/components/entry-dialog'
 import { ConfirmDialog } from '@/components/confirm-dialog'
@@ -45,6 +53,15 @@ function totals(r: MonthlyRecord) {
   }
 }
 
+const SORTS = {
+  newest: { label: 'Newest first', fn: (a: MonthlyRecord, b: MonthlyRecord) => b.year - a.year || b.month - a.month },
+  oldest: { label: 'Oldest first', fn: (a: MonthlyRecord, b: MonthlyRecord) => a.year - b.year || a.month - b.month },
+  revenue: { label: 'Highest revenue', fn: (a: MonthlyRecord, b: MonthlyRecord) => totals(b).revenue - totals(a).revenue },
+  profit: { label: 'Highest profit', fn: (a: MonthlyRecord, b: MonthlyRecord) => totals(b).profit - totals(a).profit },
+} as const
+
+type SortKey = keyof typeof SORTS
+
 export function EntriesList({
   records,
   products,
@@ -57,6 +74,29 @@ export function EntriesList({
   const [editing, setEditing] = useState<MonthlyRecord | null>(null)
   const [deleting, setDeleting] = useState<MonthlyRecord | null>(null)
   const [pendingDelete, setPendingDelete] = useState(false)
+
+  const [query, setQuery] = useState('')
+  const [productFilter, setProductFilter] = useState('all')
+  const [yearFilter, setYearFilter] = useState('all')
+  const [sort, setSort] = useState<SortKey>('newest')
+
+  const years = useMemo(
+    () => [...new Set(records.map((r) => r.year))].sort((a, b) => b - a),
+    [records]
+  )
+
+  const visible = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    return records
+      .filter((r) => {
+        if (productFilter !== 'all' && String(r.productId) !== productFilter)
+          return false
+        if (yearFilter !== 'all' && String(r.year) !== yearFilter) return false
+        if (q && !(r.productName ?? '').toLowerCase().includes(q)) return false
+        return true
+      })
+      .sort(SORTS[sort].fn)
+  }, [records, query, productFilter, yearFilter, sort])
 
   const toggle = (id: number) => {
     setExpanded((prev) => {
@@ -78,6 +118,65 @@ export function EntriesList({
 
   return (
     <>
+      <div className="space-y-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="relative flex-1">
+          <HugeiconsIcon
+            icon={Search01Icon}
+            className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+          />
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search by product…"
+            className="pl-9"
+            aria-label="Search entries"
+          />
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Select value={productFilter} onValueChange={(v) => setProductFilter(v ?? 'all')}>
+            <SelectTrigger aria-label="Filter by product">
+              {productFilter === 'all'
+                ? 'All products'
+                : products.find((p) => String(p.id) === productFilter)?.name}
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All products</SelectItem>
+              {products.map((p) => (
+                <SelectItem key={p.id} value={String(p.id)}>
+                  {p.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={yearFilter} onValueChange={(v) => setYearFilter(v ?? 'all')}>
+            <SelectTrigger aria-label="Filter by year">
+              {yearFilter === 'all' ? 'All years' : yearFilter}
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All years</SelectItem>
+              {years.map((y) => (
+                <SelectItem key={y} value={String(y)}>
+                  {y}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={sort} onValueChange={(v) => setSort((v as SortKey) ?? 'newest')}>
+            <SelectTrigger aria-label="Sort entries">
+              {SORTS[sort].label}
+            </SelectTrigger>
+            <SelectContent>
+              {(Object.keys(SORTS) as SortKey[]).map((k) => (
+                <SelectItem key={k} value={k}>
+                  {SORTS[k].label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
       <div className="overflow-hidden rounded-2xl border border-border bg-card">
         <Table>
           <TableHeader>
@@ -105,23 +204,31 @@ export function EntriesList({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {records.map((r) => {
-              const t = totals(r)
-              const isOpen = expanded.has(r.id)
-              return (
+            {visible.length === 0 ? (
+              <TableRow className="hover:bg-transparent">
+                <TableCell
+                  colSpan={8}
+                  className="py-12 text-center text-sm text-muted-foreground"
+                >
+                  No entries match your filters.
+                </TableCell>
+              </TableRow>
+            ) : (
+              visible.map((r) => (
                 <EntryRows
                   key={r.id}
                   record={r}
-                  totals={t}
-                  isOpen={isOpen}
+                  totals={totals(r)}
+                  isOpen={expanded.has(r.id)}
                   onToggle={() => toggle(r.id)}
                   onEdit={() => setEditing(r)}
                   onDelete={() => setDeleting(r)}
                 />
-              )
-            })}
+              ))
+            )}
           </TableBody>
         </Table>
+      </div>
       </div>
 
       <EntryDialog
