@@ -1,3 +1,5 @@
+<img src="public/logo.svg" alt="CostTracker" width="220" />
+
 # Cost & Profit Tracker
 
 A lightweight internal web app to manually track monthly maintenance costs and revenues across products, and visualize month-over-month profit margins.
