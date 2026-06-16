@@ -2,7 +2,7 @@
 
 import { db } from "@/lib/db"
 import { products, monthlyRecords, expenses } from "@/db/schema"
-import { eq, and, sql } from "drizzle-orm"
+import { eq, sql } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 
 export async function getProducts() {
@@ -74,7 +74,16 @@ export async function createMonthlyRecord(
   return record
 }
 
-export async function getDashboardData() {
+export type DashboardRow = {
+  productId: number
+  productName: string | null
+  month: number
+  year: number
+  revenue: number
+  cost: number
+}
+
+export async function getDashboardData(): Promise<DashboardRow[]> {
   const records = await db
     .select({
       id: monthlyRecords.id,
@@ -83,7 +92,7 @@ export async function getDashboardData() {
       year: monthlyRecords.year,
       totalRevenue: monthlyRecords.totalRevenue,
       productName: products.name,
-      expenses: sql<string>`COALESCE(SUM(${expenses.amount}), '0')`.as("total_expenses"),
+      cost: sql<string>`COALESCE(SUM(${expenses.amount}), '0')`.as("total_cost"),
     })
     .from(monthlyRecords)
     .leftJoin(products, eq(monthlyRecords.productId, products.id))
@@ -91,67 +100,14 @@ export async function getDashboardData() {
     .groupBy(monthlyRecords.id, products.name)
     .orderBy(monthlyRecords.year, monthlyRecords.month)
 
-  const aggregated = new Map<
-    string,
-    { month: number; year: number; revenue: number; cost: number }
-  >()
-
-  for (const r of records) {
-    const key = `${r.year}-${r.month}`
-    const existing = aggregated.get(key)
-    const revenue = Number(r.totalRevenue)
-    const cost = Number(r.expenses)
-
-    if (existing) {
-      existing.revenue += revenue
-      existing.cost += cost
-    } else {
-      aggregated.set(key, { month: r.month, year: r.year, revenue, cost })
-    }
-  }
-
-  return Array.from(aggregated.values())
-    .map((d) => ({
-      ...d,
-      profit: d.revenue - d.cost,
-      label: `${d.year}-${String(d.month).padStart(2, "0")}`,
-    }))
-    .sort((a, b) => a.year - b.year || a.month - b.month)
-}
-
-export async function getCurrentMonthSummary() {
-  const now = new Date()
-  const currentMonth = now.getMonth() + 1
-  const currentYear = now.getFullYear()
-
-  const records = await db
-    .select({
-      totalRevenue: monthlyRecords.totalRevenue,
-      expenses: sql<string>`COALESCE(SUM(${expenses.amount}), '0')`.as("total_expenses"),
-    })
-    .from(monthlyRecords)
-    .leftJoin(expenses, eq(monthlyRecords.id, expenses.recordId))
-    .where(
-      and(
-        eq(monthlyRecords.month, currentMonth),
-        eq(monthlyRecords.year, currentYear)
-      )
-    )
-    .groupBy(monthlyRecords.id)
-
-  let totalRevenue = 0
-  let totalCost = 0
-
-  for (const r of records) {
-    totalRevenue += Number(r.totalRevenue)
-    totalCost += Number(r.expenses)
-  }
-
-  return {
-    revenue: totalRevenue,
-    cost: totalCost,
-    profit: totalRevenue - totalCost,
-  }
+  return records.map((r) => ({
+    productId: r.productId,
+    productName: r.productName,
+    month: r.month,
+    year: r.year,
+    revenue: Number(r.totalRevenue),
+    cost: Number(r.cost),
+  }))
 }
 
 export async function getMonthlyRecords() {

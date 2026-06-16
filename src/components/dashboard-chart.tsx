@@ -1,8 +1,9 @@
 'use client'
 
 import {
-  BarChart,
+  ComposedChart,
   Bar,
+  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -11,123 +12,158 @@ import {
   ResponsiveContainer,
 } from 'recharts'
 
-type ChartData = {
+export type ChartPoint = {
   label: string
   revenue: number
   cost: number
   profit: number
+  margin: number | null
 }
 
-const fmt = (v: number) =>
+const fmtCurrency = (v: number) =>
+  new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    notation: 'compact',
+    maximumFractionDigits: 1,
+  }).format(v)
+
+const fmtFull = (v: number) =>
   new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
     minimumFractionDigits: 0,
   }).format(v)
 
+const series: Record<string, { name: string; color: string }> = {
+  revenue: { name: 'Revenue', color: 'var(--chart-3)' },
+  cost: { name: 'Cost', color: 'var(--chart-2)' },
+  profit: { name: 'Profit', color: 'var(--chart-1)' },
+  margin: { name: 'Margin', color: 'var(--chart-5)' },
+}
+
 function CustomTooltip(props: Record<string, unknown>) {
   const { active, payload, label } = props
-  if (!active || !payload || !Array.isArray(payload) || !payload.length) return null
+  if (!active || !Array.isArray(payload) || !payload.length) return null
 
   return (
-    <div className="rounded-xl bg-[#1a1a1e] border border-white/[0.06] shadow-2xl shadow-black/40 px-4 py-3">
-      <p className="text-xs text-muted-foreground mb-2 font-mono">
+    <div className="rounded-xl border border-border bg-popover px-3.5 py-3 shadow-lg">
+      <p className="mb-2 font-mono text-xs text-muted-foreground">
         {label as string}
       </p>
-      {(payload as Array<Record<string, unknown>>).map((entry, i) => (
-        <div key={i} className="flex items-center gap-2 text-sm">
-          <div
-            className="size-2 rounded-full"
-            style={{ backgroundColor: entry.color as string }}
-          />
-          <span className="text-muted-foreground">
-            {entry.name as string}:
-          </span>
-          <span className="font-medium text-foreground">
-            {fmt(Number(entry.value ?? 0))}
-          </span>
-        </div>
-      ))}
+      <div className="space-y-1.5">
+        {(payload as Array<Record<string, unknown>>).map((entry, i) => {
+          const key = entry.dataKey as string
+          const value = Number(entry.value ?? 0)
+          return (
+            <div key={i} className="flex items-center gap-2 text-sm">
+              <span
+                className="size-2 rounded-full"
+                style={{ backgroundColor: entry.color as string }}
+              />
+              <span className="text-muted-foreground">{entry.name as string}</span>
+              <span className="ml-auto pl-4 font-medium tabular-nums text-foreground">
+                {key === 'margin' ? `${value.toFixed(1)}%` : fmtFull(value)}
+              </span>
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
 
-export function DashboardChart({ data }: { data: ChartData[] }) {
+export function DashboardChart({ data }: { data: ChartPoint[] }) {
+  const tickStyle = {
+    fill: 'var(--muted-foreground)',
+    fontSize: 11,
+    fontFamily: 'var(--font-jetbrains-mono)',
+  }
+
   return (
-    <ResponsiveContainer width="100%" height={360}>
-      <BarChart
+    <ResponsiveContainer width="100%" height={340}>
+      <ComposedChart
         data={data}
-        margin={{ top: 5, right: 5, left: 5, bottom: 5 }}
-        barGap={6}
-        barCategoryGap={14}
+        margin={{ top: 8, right: 8, left: 4, bottom: 4 }}
+        barGap={4}
+        barCategoryGap="22%"
       >
-        <defs>
-          <linearGradient id="revenueGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="oklch(0.60 0.16 185)" stopOpacity={0.95} />
-            <stop offset="100%" stopColor="oklch(0.60 0.16 185)" stopOpacity={0.25} />
-          </linearGradient>
-          <linearGradient id="costGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="oklch(0.55 0.22 15)" stopOpacity={0.95} />
-            <stop offset="100%" stopColor="oklch(0.55 0.22 15)" stopOpacity={0.25} />
-          </linearGradient>
-          <linearGradient id="profitGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="oklch(0.62 0.22 288)" stopOpacity={0.95} />
-            <stop offset="100%" stopColor="oklch(0.62 0.22 288)" stopOpacity={0.25} />
-          </linearGradient>
-        </defs>
         <CartesianGrid
           strokeDasharray="3 3"
-          stroke="oklch(1 0 0 / 0.04)"
+          stroke="var(--border)"
           vertical={false}
         />
         <XAxis
           dataKey="label"
           axisLine={false}
           tickLine={false}
-          tick={{ fill: 'oklch(0.55 0.01 285)', fontSize: 11, fontFamily: 'var(--font-jetbrains-mono)' }}
+          tick={tickStyle}
           dy={8}
         />
         <YAxis
+          yAxisId="money"
           axisLine={false}
           tickLine={false}
-          tick={{ fill: 'oklch(0.55 0.01 285)', fontSize: 11, fontFamily: 'var(--font-jetbrains-mono)' }}
-          tickFormatter={fmt}
-          width={60}
+          tick={tickStyle}
+          tickFormatter={fmtCurrency}
+          width={56}
+        />
+        <YAxis
+          yAxisId="pct"
+          orientation="right"
+          axisLine={false}
+          tickLine={false}
+          tick={tickStyle}
+          tickFormatter={(v) => `${v}%`}
+          width={44}
         />
         <Tooltip
-          content={(props) => <CustomTooltip {...(props as Record<string, unknown>)} />}
-          cursor={{ fill: 'oklch(1 0 0 / 0.03)' }}
+          content={(props) => (
+            <CustomTooltip {...(props as Record<string, unknown>)} />
+          )}
+          cursor={{ fill: 'var(--muted)', opacity: 0.4 }}
         />
         <Legend
-          wrapperStyle={{
-            fontSize: 12,
-            color: 'oklch(0.55 0.01 285)',
-          }}
+          wrapperStyle={{ fontSize: 12, paddingTop: 8 }}
           iconType="circle"
           iconSize={8}
         />
         <Bar
+          yAxisId="money"
           dataKey="revenue"
-          name="Revenue"
-          fill="url(#revenueGrad)"
-          radius={[6, 6, 0, 0]}
-          maxBarSize={40}
+          name={series.revenue.name}
+          fill={series.revenue.color}
+          radius={[4, 4, 0, 0]}
+          maxBarSize={32}
         />
         <Bar
+          yAxisId="money"
           dataKey="cost"
-          name="Cost"
-          fill="url(#costGrad)"
-          radius={[6, 6, 0, 0]}
-          maxBarSize={40}
+          name={series.cost.name}
+          fill={series.cost.color}
+          radius={[4, 4, 0, 0]}
+          maxBarSize={32}
         />
         <Bar
+          yAxisId="money"
           dataKey="profit"
-          name="Profit"
-          fill="url(#profitGrad)"
-          radius={[6, 6, 0, 0]}
-          maxBarSize={40}
+          name={series.profit.name}
+          fill={series.profit.color}
+          radius={[4, 4, 0, 0]}
+          maxBarSize={32}
         />
-      </BarChart>
+        <Line
+          yAxisId="pct"
+          type="monotone"
+          dataKey="margin"
+          name={series.margin.name}
+          stroke={series.margin.color}
+          strokeWidth={2}
+          dot={{ r: 2.5, fill: series.margin.color, strokeWidth: 0 }}
+          activeDot={{ r: 4 }}
+          connectNulls={false}
+        />
+      </ComposedChart>
     </ResponsiveContainer>
   )
 }
