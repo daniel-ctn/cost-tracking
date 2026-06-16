@@ -1,11 +1,16 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { UserCircleIcon, Logout01Icon } from '@hugeicons/core-free-icons'
+import {
+  UserCircleIcon,
+  Settings01Icon,
+  Logout01Icon,
+} from '@hugeicons/core-free-icons'
 import { signOut } from '@/lib/auth-client'
 
 export function UserMenu({ email }: { email: string }) {
@@ -39,15 +44,26 @@ export function UserMenu({ email }: { email: string }) {
             <p className="text-xs text-muted-foreground">Signed in</p>
           </div>
         </div>
-        <Button
-          variant="ghost"
-          className="justify-start text-destructive hover:bg-destructive/10 hover:text-destructive"
-          onClick={handleSignOut}
-          disabled={loading}
-        >
-          <HugeiconsIcon icon={Logout01Icon} className="mr-2 size-4" />
-          {loading ? 'Signing out…' : 'Sign out'}
-        </Button>
+        <div className="flex flex-col gap-1">
+          <Button
+            variant="ghost"
+            nativeButton={false}
+            className="justify-start"
+            render={<Link href="/account" onClick={() => setOpen(false)} />}
+          >
+            <HugeiconsIcon icon={Settings01Icon} className="mr-2 size-4" />
+            Account settings
+          </Button>
+          <Button
+            variant="ghost"
+            className="justify-start text-destructive hover:bg-destructive/10 hover:text-destructive"
+            onClick={handleSignOut}
+            disabled={loading}
+          >
+            <HugeiconsIcon icon={Logout01Icon} className="mr-2 size-4" />
+            {loading ? 'Signing out…' : 'Sign out'}
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
   )
