@@ -2,17 +2,32 @@
 
 import { db } from "@/lib/db"
 import { products, monthlyRecords, expenses } from "@/db/schema"
-import { eq, sql, desc, inArray } from "drizzle-orm"
+import { and, eq, sql, desc, inArray } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
+import { requireUserId } from "@/lib/auth-helpers"
+
+async function ownedProductIds(userId: string): Promise<number[]> {
+  const rows = await db
+    .select({ id: products.id })
+    .from(products)
+    .where(eq(products.userId, userId))
+  return rows.map((r) => r.id)
+}
 
 export async function getProducts() {
-  return db.select().from(products).orderBy(products.name)
+  const userId = await requireUserId()
+  return db
+    .select()
+    .from(products)
+    .where(eq(products.userId, userId))
+    .orderBy(products.name)
 }
 
 export async function createProduct(name: string, description: string) {
+  const userId = await requireUserId()
   const [product] = await db
     .insert(products)
-    .values({ name, description: description || null })
+    .values({ userId, name, description: description || null })
     .returning()
   revalidatePath("/products")
   return product
@@ -23,17 +38,21 @@ export async function updateProduct(
   name: string,
   description: string
 ) {
+  const userId = await requireUserId()
   const [product] = await db
     .update(products)
     .set({ name, description: description || null })
-    .where(eq(products.id, id))
+    .where(and(eq(products.id, id), eq(products.userId, userId)))
     .returning()
   revalidatePath("/products")
   return product
 }
 
 export async function deleteProduct(id: number) {
-  await db.delete(products).where(eq(products.id, id))
+  const userId = await requireUserId()
+  await db
+    .delete(products)
+    .where(and(eq(products.id, id), eq(products.userId, userId)))
   revalidatePath("/products")
 }
 
@@ -72,6 +91,13 @@ export async function createMonthlyRecord(
   totalRevenue: string,
   expenseItems: ExpenseInput[]
 ): Promise<ActionResult> {
+  const userId = await requireUserId()
+  const [owned] = await db
+    .select({ id: products.id })
+    .from(products)
+    .where(and(eq(products.id, productId), eq(products.userId, userId)))
+  if (!owned) return { ok: false, error: "Product not found." }
+
   let recordId: number
   try {
     const [record] = await db
@@ -107,15 +133,24 @@ export async function updateMonthlyRecord(
   totalRevenue: string,
   expenseItems: ExpenseInput[]
 ): Promise<ActionResult> {
+  const userId = await requireUserId()
+  const owned = await ownedProductIds(userId)
+  if (!owned.includes(productId)) return { ok: false, error: "Product not found." }
+
+  let updated: { id: number }[]
   try {
-    await db
+    updated = await db
       .update(monthlyRecords)
       .set({ productId, month, year, totalRevenue })
-      .where(eq(monthlyRecords.id, id))
+      .where(
+        and(eq(monthlyRecords.id, id), inArray(monthlyRecords.productId, owned))
+      )
+      .returning({ id: monthlyRecords.id })
   } catch (e) {
     if (isDuplicatePeriodError(e)) return { ok: false, error: DUPLICATE_PERIOD_MSG }
     throw e
   }
+  if (updated.length === 0) return { ok: false, error: "Entry not found." }
 
   await db.delete(expenses).where(eq(expenses.recordId, id))
   if (expenseItems.length > 0) {
@@ -143,6 +178,7 @@ export type DashboardRow = {
 }
 
 export async function getDashboardData(): Promise<DashboardRow[]> {
+  const userId = await requireUserId()
   const records = await db
     .select({
       id: monthlyRecords.id,
@@ -154,8 +190,9 @@ export async function getDashboardData(): Promise<DashboardRow[]> {
       cost: sql<string>`COALESCE(SUM(${expenses.amount}), '0')`.as("total_cost"),
     })
     .from(monthlyRecords)
-    .leftJoin(products, eq(monthlyRecords.productId, products.id))
+    .innerJoin(products, eq(monthlyRecords.productId, products.id))
     .leftJoin(expenses, eq(monthlyRecords.id, expenses.recordId))
+    .where(eq(products.userId, userId))
     .groupBy(monthlyRecords.id, products.name)
     .orderBy(monthlyRecords.year, monthlyRecords.month)
 
@@ -186,6 +223,7 @@ export type MonthlyRecord = {
 }
 
 export async function getMonthlyRecords(): Promise<MonthlyRecord[]> {
+  const userId = await requireUserId()
   const records = await db
     .select({
       id: monthlyRecords.id,
@@ -196,7 +234,8 @@ export async function getMonthlyRecords(): Promise<MonthlyRecord[]> {
       productName: products.name,
     })
     .from(monthlyRecords)
-    .leftJoin(products, eq(monthlyRecords.productId, products.id))
+    .innerJoin(products, eq(monthlyRecords.productId, products.id))
+    .where(eq(products.userId, userId))
     .orderBy(desc(monthlyRecords.year), desc(monthlyRecords.month), desc(monthlyRecords.id))
 
   if (records.length === 0) return []
@@ -217,7 +256,11 @@ export async function getMonthlyRecords(): Promise<MonthlyRecord[]> {
 }
 
 export async function deleteMonthlyRecord(id: number) {
-  await db.delete(monthlyRecords).where(eq(monthlyRecords.id, id))
+  const userId = await requireUserId()
+  const owned = await ownedProductIds(userId)
+  await db
+    .delete(monthlyRecords)
+    .where(and(eq(monthlyRecords.id, id), inArray(monthlyRecords.productId, owned)))
   revalidatePath("/entries")
   revalidatePath("/")
 }

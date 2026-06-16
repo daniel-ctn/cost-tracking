@@ -9,9 +9,13 @@ import {
 } from "drizzle-orm/pg-core"
 
 export * from "./auth-schema"
+import { user } from "./auth-schema"
 
 export const products = pgTable("products", {
   id: serial("id").primaryKey(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   description: text("description"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
