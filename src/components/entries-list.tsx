@@ -26,9 +26,10 @@ import {
   ArrowRight01Icon,
   Search01Icon,
 } from '@hugeicons/core-free-icons'
-import { EntryDialog } from '@/components/entry-dialog'
+import { EntryDialog, type ServiceOption } from '@/components/entry-dialog'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { deleteMonthlyRecord, type MonthlyRecord } from '@/app/actions'
+import { formatMoney, type Currency } from '@/lib/currency'
 import { cn } from '@/lib/utils'
 
 type Product = { id: number; name: string }
@@ -37,9 +38,6 @@ const MONTHS = [
   'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
 ]
-
-const fmtMoney = (v: number) =>
-  new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(v)
 
 function totals(r: MonthlyRecord) {
   const revenue = Number(r.totalRevenue)
@@ -65,9 +63,13 @@ type SortKey = keyof typeof SORTS
 export function EntriesList({
   records,
   products,
+  services,
+  currency,
 }: {
   records: MonthlyRecord[]
   products: Product[]
+  services: ServiceOption[]
+  currency: Currency
 }) {
   const router = useRouter()
   const [expanded, setExpanded] = useState<Set<number>>(new Set())
@@ -219,6 +221,7 @@ export function EntriesList({
                   key={r.id}
                   record={r}
                   totals={totals(r)}
+                  currency={currency}
                   isOpen={expanded.has(r.id)}
                   onToggle={() => toggle(r.id)}
                   onEdit={() => setEditing(r)}
@@ -233,6 +236,8 @@ export function EntriesList({
 
       <EntryDialog
         products={products}
+        services={services}
+        currency={currency}
         record={editing ?? undefined}
         open={!!editing}
         onOpenChange={(open) => {
@@ -261,6 +266,7 @@ export function EntriesList({
 function EntryRows({
   record,
   totals: t,
+  currency,
   isOpen,
   onToggle,
   onEdit,
@@ -268,11 +274,13 @@ function EntryRows({
 }: {
   record: MonthlyRecord
   totals: ReturnType<typeof totals>
+  currency: Currency
   isOpen: boolean
   onToggle: () => void
   onEdit: () => void
   onDelete: () => void
 }) {
+  const fmtMoney = (v: number) => formatMoney(v, currency)
   return (
     <>
       <TableRow
@@ -347,6 +355,11 @@ function EntryRows({
         <TableRow className="hover:bg-transparent">
           <TableCell colSpan={8} className="p-0">
             <div className="border-t border-border bg-muted/30 px-6 py-4">
+              {record.note && (
+                <p className="mb-3 rounded-lg border border-border bg-card px-3 py-2 text-sm text-muted-foreground">
+                  {record.note}
+                </p>
+              )}
               <p className="mb-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
                 Cost breakdown
               </p>

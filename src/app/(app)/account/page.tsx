@@ -1,6 +1,8 @@
 import { redirect } from 'next/navigation'
 import { getSessionUser } from '@/lib/auth-helpers'
+import { getUserSettings } from '@/app/actions'
 import { ChangePasswordForm } from '@/components/change-password-form'
+import { AccountSettingsForm } from '@/components/account-settings-form'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { UserCircleIcon } from '@hugeicons/core-free-icons'
 
@@ -9,6 +11,7 @@ export const dynamic = 'force-dynamic'
 export default async function AccountPage() {
   const user = await getSessionUser()
   if (!user) redirect('/login')
+  const settings = await getUserSettings()
 
   return (
     <div className="mx-auto max-w-xl space-y-8">
@@ -30,6 +33,11 @@ export default async function AccountPage() {
           </div>
         </div>
       </div>
+
+      <AccountSettingsForm
+        currency={settings.currency}
+        monthlyBudget={settings.monthlyBudget}
+      />
 
       <ChangePasswordForm />
     </div>

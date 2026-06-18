@@ -4,7 +4,13 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { Add01Icon, Delete02Icon, File01Icon } from '@hugeicons/core-free-icons'
+import {
+  Add01Icon,
+  Delete02Icon,
+  File01Icon,
+  Copy01Icon,
+  RepeatIcon,
+} from '@hugeicons/core-free-icons'
 import {
   Dialog,
   DialogContent,
@@ -13,6 +19,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import {
   Select,
   SelectContent,
@@ -22,11 +29,19 @@ import {
 import {
   createMonthlyRecord,
   updateMonthlyRecord,
+  getPreviousEntryExpenses,
+  getTemplatesForProduct,
   type MonthlyRecord,
 } from '@/app/actions'
+import { formatMoney, type Currency } from '@/lib/currency'
 import { cn } from '@/lib/utils'
 
 type Product = { id: number; name: string }
+export type ServiceOption = {
+  id: number
+  name: string
+  defaultAmount: string | null
+}
 
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -36,19 +51,20 @@ const MONTHS = [
 const currentYear = new Date().getFullYear()
 const YEARS = Array.from({ length: 6 }, (_, i) => currentYear - 4 + i)
 
-const fmtMoney = (v: number) =>
-  new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(v)
-
-type ExpenseRow = { serviceName: string; amount: string }
+type ExpenseRow = { serviceName: string; amount: string; serviceId: number | null }
 
 export function EntryDialog({
   products,
+  services,
   record,
+  currency,
   open,
   onOpenChange,
 }: {
   products: Product[]
+  services: ServiceOption[]
   record?: MonthlyRecord
+  currency: Currency
   open: boolean
   onOpenChange: (open: boolean) => void
 }) {
@@ -67,7 +83,9 @@ export function EntryDialog({
           <EntryForm
             key={record?.id ?? 'new'}
             products={products}
+            services={services}
             record={record}
+            currency={currency}
             onOpenChange={onOpenChange}
           />
         )}
@@ -78,11 +96,15 @@ export function EntryDialog({
 
 function EntryForm({
   products,
+  services,
   record,
+  currency,
   onOpenChange,
 }: {
   products: Product[]
+  services: ServiceOption[]
   record?: MonthlyRecord
+  currency: Currency
   onOpenChange: (open: boolean) => void
 }) {
   const router = useRouter()
@@ -94,13 +116,15 @@ function EntryForm({
     record ? String(record.year) : String(currentYear)
   )
   const [revenue, setRevenue] = useState(record ? record.totalRevenue : '')
+  const [note, setNote] = useState(record?.note ?? '')
   const [expenseItems, setExpenseItems] = useState<ExpenseRow[]>(
     record && record.expenses.length > 0
       ? record.expenses.map((e) => ({
           serviceName: e.serviceName,
           amount: e.amount,
+          serviceId: e.serviceId,
         }))
-      : [{ serviceName: '', amount: '' }]
+      : [{ serviceName: '', amount: '', serviceId: null }]
   )
   const [errors, setErrors] = useState<{
     product?: string
@@ -111,15 +135,72 @@ function EntryForm({
   }>({ expenses: [] })
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [prefilling, setPrefilling] = useState<null | 'copy' | 'template'>(null)
+
+  const fmt = (v: number) => formatMoney(v, currency)
 
   const addRow = () =>
-    setExpenseItems([...expenseItems, { serviceName: '', amount: '' }])
+    setExpenseItems([...expenseItems, { serviceName: '', amount: '', serviceId: null }])
   const removeRow = (i: number) =>
     setExpenseItems(expenseItems.filter((_, idx) => idx !== i))
-  const updateRow = (i: number, field: keyof ExpenseRow, value: string) => {
+  const updateRow = (i: number, field: 'serviceName' | 'amount', value: string) => {
     const next = [...expenseItems]
-    next[i] = { ...next[i], [field]: value }
+    // Editing the name detaches a row from its catalog service.
+    next[i] = {
+      ...next[i],
+      [field]: value,
+      ...(field === 'serviceName' ? { serviceId: null } : {}),
+    }
     setExpenseItems(next)
+  }
+
+  const replaceRows = (rows: ExpenseRow[]) =>
+    setExpenseItems(rows.length > 0 ? rows : [{ serviceName: '', amount: '', serviceId: null }])
+
+  const addFromService = (sid: string | null) => {
+    const svc = services.find((s) => String(s.id) === sid)
+    if (!svc) return
+    const row: ExpenseRow = {
+      serviceName: svc.name,
+      amount: svc.defaultAmount ?? '',
+      serviceId: svc.id,
+    }
+    // Replace a leading empty row, otherwise append.
+    const onlyEmpty =
+      expenseItems.length === 1 &&
+      !expenseItems[0].serviceName &&
+      !expenseItems[0].amount
+    setExpenseItems(onlyEmpty ? [row] : [...expenseItems, row])
+  }
+
+  const copyLastMonth = async () => {
+    if (!productId || !month || !year) return
+    setPrefilling('copy')
+    const rows = await getPreviousEntryExpenses(
+      Number(productId),
+      Number(year),
+      Number(month)
+    )
+    setPrefilling(null)
+    if (rows.length === 0) {
+      setSubmitError('No earlier entry found for this product.')
+      return
+    }
+    setSubmitError(null)
+    replaceRows(rows)
+  }
+
+  const useTemplates = async () => {
+    if (!productId) return
+    setPrefilling('template')
+    const rows = await getTemplatesForProduct(Number(productId))
+    setPrefilling(null)
+    if (rows.length === 0) {
+      setSubmitError('No active templates for this product.')
+      return
+    }
+    setSubmitError(null)
+    replaceRows(rows)
   }
 
   const totalCost = expenseItems.reduce(
@@ -127,8 +208,7 @@ function EntryForm({
     0
   )
   const profit = (Number(revenue) || 0) - totalCost
-  const margin =
-    Number(revenue) > 0 ? (profit / Number(revenue)) * 100 : null
+  const margin = Number(revenue) > 0 ? (profit / Number(revenue)) * 100 : null
 
   const validate = () => {
     const next: typeof errors = { expenses: [] }
@@ -137,8 +217,7 @@ function EntryForm({
     if (!year) next.year = 'Required'
     const rev = Number(revenue)
     if (revenue.trim() === '') next.revenue = 'Required'
-    else if (!Number.isFinite(rev) || rev < 0)
-      next.revenue = 'Enter a valid amount'
+    else if (!Number.isFinite(rev) || rev < 0) next.revenue = 'Enter a valid amount'
 
     next.expenses = expenseItems.map((it) => {
       const hasName = it.serviceName.trim() !== ''
@@ -166,13 +245,18 @@ function EntryForm({
     setSaving(true)
     const items = expenseItems
       .filter((it) => it.serviceName.trim() && it.amount.trim())
-      .map((it) => ({ serviceName: it.serviceName.trim(), amount: it.amount }))
+      .map((it) => ({
+        serviceName: it.serviceName.trim(),
+        amount: it.amount,
+        serviceId: it.serviceId,
+      }))
 
     const payload = {
       productId: Number(productId),
       month: Number(month),
       year: Number(year),
       totalRevenue: revenue,
+      note: note.trim() || null,
       expenseItems: items,
     }
     const res = record
@@ -244,7 +328,7 @@ function EntryForm({
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="revenue">Total revenue ($)</Label>
+        <Label htmlFor="revenue">Total revenue</Label>
         <Input
           id="revenue"
           type="number"
@@ -260,13 +344,52 @@ function EntryForm({
       </div>
 
       <div className="space-y-3">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <Label>Cost items</Label>
-          <Button type="button" variant="outline" size="xs" onClick={addRow}>
-            <HugeiconsIcon icon={Add01Icon} className="mr-1 size-3" />
-            Add cost
-          </Button>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <Button
+              type="button"
+              variant="outline"
+              size="xs"
+              onClick={copyLastMonth}
+              disabled={!productId || !month || !year || prefilling !== null}
+            >
+              <HugeiconsIcon icon={Copy01Icon} className="mr-1 size-3" />
+              {prefilling === 'copy' ? 'Copying…' : 'Last month'}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="xs"
+              onClick={useTemplates}
+              disabled={!productId || prefilling !== null}
+            >
+              <HugeiconsIcon icon={RepeatIcon} className="mr-1 size-3" />
+              {prefilling === 'template' ? 'Loading…' : 'Templates'}
+            </Button>
+            <Button type="button" variant="outline" size="xs" onClick={addRow}>
+              <HugeiconsIcon icon={Add01Icon} className="mr-1 size-3" />
+              Add
+            </Button>
+          </div>
         </div>
+
+        {services.length > 0 && (
+          <Select value="" onValueChange={addFromService}>
+            <SelectTrigger className="w-full">
+              <span className="text-muted-foreground">＋ Add from service catalog</span>
+            </SelectTrigger>
+            <SelectContent>
+              {services.map((s) => (
+                <SelectItem key={s.id} value={String(s.id)}>
+                  {s.name}
+                  {s.defaultAmount ? ` · ${fmt(Number(s.defaultAmount))}` : ''}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+
         {expenseItems.map((item, i) => (
           <div key={i} className="space-y-1">
             <div className="flex items-start gap-2">
@@ -306,6 +429,17 @@ function EntryForm({
         ))}
       </div>
 
+      <div className="space-y-2">
+        <Label htmlFor="note">Note (optional)</Label>
+        <Textarea
+          id="note"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder="Explain a spike or one-off change…"
+          rows={2}
+        />
+      </div>
+
       <div className="flex items-center justify-between rounded-lg border border-border bg-muted/40 px-3.5 py-3 text-sm">
         <span className="text-muted-foreground">Projected profit</span>
         <span className="flex items-baseline gap-2">
@@ -315,7 +449,7 @@ function EntryForm({
               profit >= 0 ? 'text-foreground' : 'text-destructive'
             )}
           >
-            {fmtMoney(profit)}
+            {fmt(profit)}
           </span>
           {margin !== null && (
             <span className="text-xs text-muted-foreground tabular-nums">

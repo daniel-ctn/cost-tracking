@@ -1,16 +1,27 @@
-import { getMonthlyRecords, getProducts } from '@/app/actions'
+import {
+  getMonthlyRecords,
+  getProducts,
+  getServices,
+  getUserSettings,
+} from '@/app/actions'
 import { EntriesList } from '@/components/entries-list'
 import { AddEntryButton } from '@/components/add-entry-button'
+import { ImportExportBar } from '@/components/import-export-bar'
 import { EmptyState } from '@/components/empty-state'
 import { File01Icon } from '@hugeicons/core-free-icons'
 
 export const dynamic = 'force-dynamic'
 
 export default async function EntriesPage() {
-  const [records, products] = await Promise.all([
+  const [records, products, allServices, settings] = await Promise.all([
     getMonthlyRecords(),
     getProducts(),
+    getServices(),
+    getUserSettings(),
   ])
+  const services = allServices
+    .filter((s) => s.isActive)
+    .map((s) => ({ id: s.id, name: s.name, defaultAmount: s.defaultAmount }))
 
   return (
     <div className="space-y-8">
@@ -23,7 +34,16 @@ export default async function EntriesPage() {
             Monthly entries
           </h1>
         </div>
-        {products.length > 0 && <AddEntryButton products={products} />}
+        <div className="flex items-center gap-2">
+          <ImportExportBar />
+          {products.length > 0 && (
+            <AddEntryButton
+              products={products}
+              services={services}
+              currency={settings.currency}
+            />
+          )}
+        </div>
       </div>
 
       {products.length === 0 ? (
@@ -37,10 +57,21 @@ export default async function EntriesPage() {
           icon={File01Icon}
           title="No entries yet"
           description="Record your first month of revenue and costs to start tracking profit."
-          action={<AddEntryButton products={products} />}
+          action={
+            <AddEntryButton
+              products={products}
+              services={services}
+              currency={settings.currency}
+            />
+          }
         />
       ) : (
-        <EntriesList records={records} products={products} />
+        <EntriesList
+          records={records}
+          products={products}
+          services={services}
+          currency={settings.currency}
+        />
       )}
     </div>
   )
