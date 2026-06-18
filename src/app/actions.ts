@@ -1,10 +1,20 @@
 "use server"
 
 import { db } from "@/lib/db"
-import { products, monthlyRecords, expenses } from "@/db/schema"
+import {
+  products,
+  monthlyRecords,
+  expenses,
+  services,
+} from "@/db/schema"
 import { and, eq, sql, desc, inArray } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { requireUserId } from "@/lib/auth-helpers"
+import {
+  parse,
+  productSchema,
+  monthlyRecordSchema,
+} from "@/lib/validation"
 
 async function ownedProductIds(userId: string): Promise<number[]> {
   const rows = await db
@@ -12,6 +22,20 @@ async function ownedProductIds(userId: string): Promise<number[]> {
     .from(products)
     .where(eq(products.userId, userId))
   return rows.map((r) => r.id)
+}
+
+/** Returns the subset of the given service ids that belong to the user. */
+async function ownedServiceIds(
+  userId: string,
+  ids: number[]
+): Promise<Set<number>> {
+  const unique = [...new Set(ids)]
+  if (unique.length === 0) return new Set()
+  const rows = await db
+    .select({ id: services.id })
+    .from(services)
+    .where(and(eq(services.userId, userId), inArray(services.id, unique)))
+  return new Set(rows.map((r) => r.id))
 }
 
 export async function getProducts() {
@@ -23,29 +47,48 @@ export async function getProducts() {
     .orderBy(products.name)
 }
 
-export async function createProduct(name: string, description: string) {
+export type ActionResult = { ok: true } | { ok: false; error: string }
+
+export async function createProduct(
+  name: string,
+  description: string,
+  monthlyBudget?: string
+): Promise<ActionResult> {
   const userId = await requireUserId()
-  const [product] = await db
-    .insert(products)
-    .values({ userId, name, description: description || null })
-    .returning()
+  const parsed = parse(productSchema, { name, description, monthlyBudget })
+  if (!parsed.ok) return { ok: false, error: parsed.error }
+
+  await db.insert(products).values({
+    userId,
+    name: parsed.data.name,
+    description: parsed.data.description,
+    monthlyBudget: parsed.data.monthlyBudget,
+  })
   revalidatePath("/products")
-  return product
+  return { ok: true }
 }
 
 export async function updateProduct(
   id: number,
   name: string,
-  description: string
-) {
+  description: string,
+  monthlyBudget?: string
+): Promise<ActionResult> {
   const userId = await requireUserId()
-  const [product] = await db
+  const parsed = parse(productSchema, { name, description, monthlyBudget })
+  if (!parsed.ok) return { ok: false, error: parsed.error }
+
+  await db
     .update(products)
-    .set({ name, description: description || null })
+    .set({
+      name: parsed.data.name,
+      description: parsed.data.description,
+      monthlyBudget: parsed.data.monthlyBudget,
+    })
     .where(and(eq(products.id, id), eq(products.userId, userId)))
-    .returning()
   revalidatePath("/products")
-  return product
+  revalidatePath("/")
+  return { ok: true }
 }
 
 export async function deleteProduct(id: number) {
@@ -54,14 +97,23 @@ export async function deleteProduct(id: number) {
     .delete(products)
     .where(and(eq(products.id, id), eq(products.userId, userId)))
   revalidatePath("/products")
+  revalidatePath("/")
 }
 
 export type ExpenseInput = {
   serviceName: string
   amount: string
+  serviceId?: number | null
 }
 
-export type ActionResult = { ok: true } | { ok: false; error: string }
+export type MonthlyRecordInput = {
+  productId: number
+  month: number
+  year: number
+  totalRevenue: string
+  note?: string | null
+  expenseItems: ExpenseInput[]
+}
 
 const DUPLICATE_PERIOD_MSG =
   "An entry for this product and period already exists. Edit the existing entry instead."
@@ -84,40 +136,70 @@ function isDuplicatePeriodError(e: unknown): boolean {
   return false
 }
 
+/** Validate input + verify product/service ownership for a record write. */
+async function prepareRecordWrite(userId: string, input: MonthlyRecordInput) {
+  const parsed = parse(monthlyRecordSchema, input)
+  if (!parsed.ok) return { ok: false as const, error: parsed.error }
+
+  const owned = await ownedProductIds(userId)
+  if (!owned.includes(parsed.data.productId)) {
+    return { ok: false as const, error: "Product not found." }
+  }
+
+  const serviceIds = parsed.data.expenseItems
+    .map((e) => e.serviceId)
+    .filter((id): id is number => typeof id === "number")
+  const validServices = await ownedServiceIds(userId, serviceIds)
+  const items = parsed.data.expenseItems.map((e) => ({
+    serviceName: e.serviceName,
+    amount: e.amount,
+    // Drop links to services the user doesn't own; keep the free-text name.
+    serviceId: e.serviceId && validServices.has(e.serviceId) ? e.serviceId : null,
+  }))
+
+  return { ok: true as const, data: parsed.data, owned, items }
+}
+
 export async function createMonthlyRecord(
-  productId: number,
-  month: number,
-  year: number,
-  totalRevenue: string,
-  expenseItems: ExpenseInput[]
+  input: MonthlyRecordInput
 ): Promise<ActionResult> {
   const userId = await requireUserId()
-  const [owned] = await db
-    .select({ id: products.id })
-    .from(products)
-    .where(and(eq(products.id, productId), eq(products.userId, userId)))
-  if (!owned) return { ok: false, error: "Product not found." }
+  const prep = await prepareRecordWrite(userId, input)
+  if (!prep.ok) return { ok: false, error: prep.error }
+  const { data, items } = prep
+  const { productId, month, year, totalRevenue, note } = data
 
-  let recordId: number
   try {
-    const [record] = await db
-      .insert(monthlyRecords)
-      .values({ productId, month, year, totalRevenue })
-      .returning({ id: monthlyRecords.id })
-    recordId = record.id
+    if (items.length === 0) {
+      await db.insert(monthlyRecords).values({
+        productId,
+        month,
+        year,
+        totalRevenue,
+        note,
+      })
+    } else {
+      // Single CTE statement = atomic: the record and its expenses commit or
+      // roll back together (neon-http has no interactive transactions).
+      const values = items.map(
+        (e) =>
+          sql`(${e.serviceName}::text, ${e.amount}::numeric, ${e.serviceId}::integer)`
+      )
+      await db.execute(sql`
+        WITH r AS (
+          INSERT INTO monthly_records (product_id, month, year, total_revenue, note)
+          VALUES (${productId}, ${month}, ${year}, ${totalRevenue}::numeric, ${note})
+          RETURNING id
+        )
+        INSERT INTO expenses (record_id, service_name, amount, service_id)
+        SELECT r.id, v.service_name, v.amount, v.service_id
+        FROM r, (VALUES ${sql.join(values, sql`, `)})
+          AS v(service_name, amount, service_id)
+      `)
+    }
   } catch (e) {
     if (isDuplicatePeriodError(e)) return { ok: false, error: DUPLICATE_PERIOD_MSG }
     throw e
-  }
-
-  if (expenseItems.length > 0) {
-    await db.insert(expenses).values(
-      expenseItems.map((e) => ({
-        recordId,
-        serviceName: e.serviceName,
-        amount: e.amount,
-      }))
-    )
   }
 
   revalidatePath("/entries")
@@ -127,40 +209,48 @@ export async function createMonthlyRecord(
 
 export async function updateMonthlyRecord(
   id: number,
-  productId: number,
-  month: number,
-  year: number,
-  totalRevenue: string,
-  expenseItems: ExpenseInput[]
+  input: MonthlyRecordInput
 ): Promise<ActionResult> {
   const userId = await requireUserId()
-  const owned = await ownedProductIds(userId)
-  if (!owned.includes(productId)) return { ok: false, error: "Product not found." }
+  const prep = await prepareRecordWrite(userId, input)
+  if (!prep.ok) return { ok: false, error: prep.error }
+  const { data, owned, items } = prep
+  const { productId, month, year, totalRevenue, note } = data
 
-  let updated: { id: number }[]
+  // Authorize the target record before mutating, so a forged id can't delete
+  // another user's expenses via the recordId-scoped delete below.
+  const [rec] = await db
+    .select({ id: monthlyRecords.id })
+    .from(monthlyRecords)
+    .innerJoin(products, eq(monthlyRecords.productId, products.id))
+    .where(and(eq(monthlyRecords.id, id), eq(products.userId, userId)))
+  if (!rec) return { ok: false, error: "Entry not found." }
+
+  const updateQ = db
+    .update(monthlyRecords)
+    .set({ productId, month, year, totalRevenue, note })
+    .where(
+      and(eq(monthlyRecords.id, id), inArray(monthlyRecords.productId, owned))
+    )
+  const deleteQ = db.delete(expenses).where(eq(expenses.recordId, id))
+
   try {
-    updated = await db
-      .update(monthlyRecords)
-      .set({ productId, month, year, totalRevenue })
-      .where(
-        and(eq(monthlyRecords.id, id), inArray(monthlyRecords.productId, owned))
+    if (items.length > 0) {
+      const insertQ = db.insert(expenses).values(
+        items.map((e) => ({
+          recordId: id,
+          serviceName: e.serviceName,
+          amount: e.amount,
+          serviceId: e.serviceId,
+        }))
       )
-      .returning({ id: monthlyRecords.id })
+      await db.batch([updateQ, deleteQ, insertQ])
+    } else {
+      await db.batch([updateQ, deleteQ])
+    }
   } catch (e) {
     if (isDuplicatePeriodError(e)) return { ok: false, error: DUPLICATE_PERIOD_MSG }
     throw e
-  }
-  if (updated.length === 0) return { ok: false, error: "Entry not found." }
-
-  await db.delete(expenses).where(eq(expenses.recordId, id))
-  if (expenseItems.length > 0) {
-    await db.insert(expenses).values(
-      expenseItems.map((e) => ({
-        recordId: id,
-        serviceName: e.serviceName,
-        amount: e.amount,
-      }))
-    )
   }
 
   revalidatePath("/entries")
@@ -210,6 +300,7 @@ export type RecordExpense = {
   id: number
   serviceName: string
   amount: string
+  serviceId: number | null
 }
 
 export type MonthlyRecord = {
@@ -219,6 +310,7 @@ export type MonthlyRecord = {
   month: number
   year: number
   totalRevenue: string
+  note: string | null
   expenses: RecordExpense[]
 }
 
@@ -231,24 +323,39 @@ export async function getMonthlyRecords(): Promise<MonthlyRecord[]> {
       month: monthlyRecords.month,
       year: monthlyRecords.year,
       totalRevenue: monthlyRecords.totalRevenue,
+      note: monthlyRecords.note,
       productName: products.name,
     })
     .from(monthlyRecords)
     .innerJoin(products, eq(monthlyRecords.productId, products.id))
     .where(eq(products.userId, userId))
-    .orderBy(desc(monthlyRecords.year), desc(monthlyRecords.month), desc(monthlyRecords.id))
+    .orderBy(
+      desc(monthlyRecords.year),
+      desc(monthlyRecords.month),
+      desc(monthlyRecords.id)
+    )
 
   if (records.length === 0) return []
 
   const rows = await db
     .select()
     .from(expenses)
-    .where(inArray(expenses.recordId, records.map((r) => r.id)))
+    .where(
+      inArray(
+        expenses.recordId,
+        records.map((r) => r.id)
+      )
+    )
 
   const byRecord = new Map<number, RecordExpense[]>()
   for (const e of rows) {
     const list = byRecord.get(e.recordId) ?? []
-    list.push({ id: e.id, serviceName: e.serviceName, amount: e.amount })
+    list.push({
+      id: e.id,
+      serviceName: e.serviceName,
+      amount: e.amount,
+      serviceId: e.serviceId,
+    })
     byRecord.set(e.recordId, list)
   }
 
@@ -258,6 +365,7 @@ export async function getMonthlyRecords(): Promise<MonthlyRecord[]> {
 export async function deleteMonthlyRecord(id: number) {
   const userId = await requireUserId()
   const owned = await ownedProductIds(userId)
+  if (owned.length === 0) return
   await db
     .delete(monthlyRecords)
     .where(and(eq(monthlyRecords.id, id), inArray(monthlyRecords.productId, owned)))

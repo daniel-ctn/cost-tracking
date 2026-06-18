@@ -84,7 +84,7 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ```
 src/
-  middleware.ts             Auth route guard (redirects to /login)
+  proxy.ts                  Auth route guard (redirects to /login; Next 16 proxy)
   app/
     layout.tsx              Root layout (fonts + theme provider)
     globals.css             Tailwind v4 theme tokens (light + dark)

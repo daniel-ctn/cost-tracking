@@ -139,9 +139,3 @@
     @apply font-sans;
   }
 }
-
-@layer utilities {
-  .text-gradient {
-    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary to-chart-5;
-  }
-}

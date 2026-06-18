@@ -3,7 +3,7 @@ import { getSessionCookie } from "better-auth/cookies"
 
 const AUTH_ROUTES = ["/login", "/signup", "/forgot-password", "/reset-password"]
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
   const hasSession = !!getSessionCookie(request)
   const isAuthRoute = AUTH_ROUTES.some(

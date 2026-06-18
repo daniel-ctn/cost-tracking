@@ -168,22 +168,16 @@ function EntryForm({
       .filter((it) => it.serviceName.trim() && it.amount.trim())
       .map((it) => ({ serviceName: it.serviceName.trim(), amount: it.amount }))
 
+    const payload = {
+      productId: Number(productId),
+      month: Number(month),
+      year: Number(year),
+      totalRevenue: revenue,
+      expenseItems: items,
+    }
     const res = record
-      ? await updateMonthlyRecord(
-          record.id,
-          Number(productId),
-          Number(month),
-          Number(year),
-          revenue,
-          items
-        )
-      : await createMonthlyRecord(
-          Number(productId),
-          Number(month),
-          Number(year),
-          revenue,
-          items
-        )
+      ? await updateMonthlyRecord(record.id, payload)
+      : await createMonthlyRecord(payload)
     setSaving(false)
     if (!res.ok) {
       setSubmitError(res.error)
