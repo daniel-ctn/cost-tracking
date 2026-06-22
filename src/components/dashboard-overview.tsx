@@ -4,14 +4,14 @@ import { useMemo, useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
   ChartHistogramIcon,
-  PackageIcon,
-  PieChartIcon,
   AlertCircleIcon,
   InformationCircleIcon,
+  CheckmarkCircle02Icon,
 } from '@hugeicons/core-free-icons'
 import { cn } from '@/lib/utils'
 import { DashboardChart, type ChartPoint } from '@/components/dashboard-chart'
 import { DashboardHero } from '@/components/dashboard-hero'
+import { SectionHeading } from '@/components/section-heading'
 import { formatMoney, type Currency } from '@/lib/currency'
 import type { DashboardRow, Insight, CostBreakdown } from '@/app/actions'
 
@@ -117,7 +117,6 @@ export function DashboardOverview({
   currency: Currency
 }) {
   const [range, setRange] = useState<RangeId>('12m')
-  const fmtMoney = (v: number) => formatMoney(v, currency, { compact: true })
 
   const view = useMemo(() => {
     const win = resolveWindow(range, rows)
@@ -222,14 +221,12 @@ export function DashboardOverview({
       {view.hasData && (
         <>
           <div className="rounded-2xl border border-border bg-card p-6">
-            <div className="mb-5 flex items-center gap-2">
-              <HugeiconsIcon
-                icon={ChartHistogramIcon}
-                className="size-4 text-muted-foreground"
-              />
-              <h2 className="text-sm font-semibold">Monthly performance</h2>
-              <span className="text-xs text-muted-foreground">· {rangeLabel}</span>
-            </div>
+            <SectionHeading
+              eyebrow="Trend"
+              title="Monthly performance"
+              meta={rangeLabel}
+              className="mb-5"
+            />
             <DashboardChart data={view.monthly} currency={currency} />
           </div>
 
@@ -248,117 +245,195 @@ export function DashboardOverview({
             </div>
           )}
 
-          <div className="rounded-2xl border border-border bg-card p-6">
-            <div className="mb-5 flex items-center gap-2">
-              <HugeiconsIcon
-                icon={PackageIcon}
-                className="size-4 text-muted-foreground"
-              />
-              <h2 className="text-sm font-semibold">Profit by product</h2>
-              <span className="text-xs text-muted-foreground">· {rangeLabel}</span>
-            </div>
-            {view.products.length === 0 ? (
-              <p className="py-6 text-center text-sm text-muted-foreground">
-                No product activity in this period.
-              </p>
-            ) : (
-              <div className="space-y-1">
-                <div className="grid grid-cols-[1fr_auto] items-center gap-4 px-2 pb-2 text-xs uppercase tracking-wider text-muted-foreground sm:grid-cols-[minmax(0,1.6fr)_repeat(4,minmax(0,1fr))]">
-                  <span>Product</span>
-                  <span className="hidden text-right sm:block">Revenue</span>
-                  <span className="hidden text-right sm:block">Cost</span>
-                  <span className="text-right">Profit</span>
-                  <span className="hidden text-right sm:block">Margin</span>
-                </div>
-                {view.products.map((p) => (
-                  <div
-                    key={p.id}
-                    className="grid grid-cols-[1fr_auto] items-center gap-4 rounded-lg px-2 py-2.5 hover:bg-muted/50 sm:grid-cols-[minmax(0,1.6fr)_repeat(4,minmax(0,1fr))]"
-                  >
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="truncate font-medium">{p.name}</span>
-                      </div>
-                      <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                        <div
-                          className={cn(
-                            'h-full rounded-full',
-                            p.profit >= 0 ? 'bg-primary' : 'bg-destructive'
-                          )}
-                          style={{
-                            width: `${(Math.abs(p.profit) / view.maxAbsProfit) * 100}%`,
-                          }}
-                        />
-                      </div>
-                    </div>
-                    <span className="hidden text-right text-sm tabular-nums text-muted-foreground sm:block">
-                      {fmtMoney(p.revenue)}
-                    </span>
-                    <span className="hidden text-right text-sm tabular-nums text-muted-foreground sm:block">
-                      {fmtMoney(p.cost)}
-                    </span>
-                    <span
-                      className={cn(
-                        'text-right text-sm font-semibold tabular-nums',
-                        p.profit >= 0 ? 'text-foreground' : 'text-destructive'
-                      )}
-                    >
-                      {fmtMoney(p.profit)}
-                    </span>
-                    <span className="hidden text-right text-sm tabular-nums text-muted-foreground sm:block">
-                      {p.margin.toFixed(1)}%
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          <ProfitLeaderboard
+            products={view.products}
+            maxAbsProfit={view.maxAbsProfit}
+            currency={currency}
+            rangeLabel={rangeLabel}
+          />
         </>
       )}
     </div>
   )
 }
 
-function InsightsPanel({ insights }: { insights: Insight[] }) {
+type ProductRow = {
+  id: number
+  name: string
+  revenue: number
+  cost: number
+  profit: number
+  margin: number
+}
+
+function ProfitLeaderboard({
+  products,
+  maxAbsProfit,
+  currency,
+  rangeLabel,
+}: {
+  products: ProductRow[]
+  maxAbsProfit: number
+  currency: Currency
+  rangeLabel: string
+}) {
+  const fmtMoney = (v: number) => formatMoney(v, currency, { compact: true })
+  const profitable = products.filter((p) => p.profit > 0).length
+
   return (
     <div className="rounded-2xl border border-border bg-card p-6">
-      <div className="mb-4 flex items-center gap-2">
-        <HugeiconsIcon icon={AlertCircleIcon} className="size-4 text-muted-foreground" />
-        <h2 className="text-sm font-semibold">Insights</h2>
-        <span className="text-xs text-muted-foreground">
-          · {insights.length} to review
-        </span>
-      </div>
-      <div className="grid gap-2 sm:grid-cols-2">
-        {insights.slice(0, 8).map((it) => (
-          <div
-            key={it.id}
-            className={cn(
-              'flex gap-2.5 rounded-lg border px-3 py-2.5',
-              it.severity === 'warning'
-                ? 'border-destructive/20 bg-destructive/5'
-                : 'border-border bg-muted/30'
-            )}
-          >
-            <HugeiconsIcon
-              icon={
-                it.severity === 'warning' ? AlertCircleIcon : InformationCircleIcon
-              }
-              className={cn(
-                'mt-0.5 size-4 shrink-0',
-                it.severity === 'warning' ? 'text-destructive' : 'text-muted-foreground'
+      <SectionHeading
+        eyebrow="Ranked"
+        title="Profit by product"
+        meta={
+          products.length > 0
+            ? `${profitable}/${products.length} profitable · ${rangeLabel}`
+            : rangeLabel
+        }
+        className="mb-5"
+      />
+      {products.length === 0 ? (
+        <p className="py-6 text-center text-sm text-muted-foreground">
+          No product activity in this period.
+        </p>
+      ) : (
+        <ol className="space-y-1.5">
+          {products.map((p, i) => {
+            const loss = p.profit < 0
+            return (
+              <li
+                key={p.id}
+                className="grid grid-cols-[auto_1fr_auto] items-center gap-x-4 gap-y-1 rounded-xl px-2.5 py-2.5 hover:bg-muted/40 sm:grid-cols-[auto_minmax(0,1.4fr)_repeat(3,minmax(0,1fr))]"
+              >
+                <span
+                  className={cn(
+                    'flex size-6 items-center justify-center rounded-md font-mono text-xs font-semibold tabular-nums',
+                    i === 0 && !loss
+                      ? 'bg-primary/15 text-primary'
+                      : 'bg-muted text-muted-foreground'
+                  )}
+                >
+                  {i + 1}
+                </span>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="truncate font-medium">{p.name}</span>
+                    {i === 0 && !loss && (
+                      <span className="hidden rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-primary sm:inline">
+                        Top
+                      </span>
+                    )}
+                    {loss && (
+                      <span className="rounded-full bg-destructive/10 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-destructive">
+                        Loss
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                    <div
+                      className={cn(
+                        'h-full rounded-full',
+                        loss ? 'bg-destructive' : 'bg-primary'
+                      )}
+                      style={{
+                        width: `${(Math.abs(p.profit) / maxAbsProfit) * 100}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+                <span className="hidden text-right text-sm tabular-nums text-muted-foreground sm:block">
+                  {fmtMoney(p.revenue)}
+                </span>
+                <span className="hidden text-right text-sm tabular-nums text-muted-foreground sm:block">
+                  {p.margin.toFixed(1)}%
+                </span>
+                <span
+                  className={cn(
+                    'text-right text-sm font-semibold tabular-nums',
+                    loss ? 'text-destructive' : 'text-foreground'
+                  )}
+                >
+                  {fmtMoney(p.profit)}
+                </span>
+              </li>
+            )
+          })}
+        </ol>
+      )}
+    </div>
+  )
+}
+
+function InsightsPanel({ insights }: { insights: Insight[] }) {
+  const warnings = insights.filter((i) => i.severity === 'warning').length
+  const notes = insights.length - warnings
+  return (
+    <div className="rounded-2xl border border-border bg-card p-6">
+      <SectionHeading
+        eyebrow="Signals"
+        title="Needs attention"
+        accent={warnings > 0 ? 'destructive' : 'primary'}
+        meta={
+          warnings > 0 ? (
+            <span className="inline-flex items-center gap-1.5">
+              <span className="inline-flex items-center gap-1 rounded-full bg-destructive/10 px-2 py-0.5 text-xs font-medium text-destructive">
+                <HugeiconsIcon icon={AlertCircleIcon} className="size-3.5" />
+                {warnings}
+              </span>
+              {notes > 0 && (
+                <span className="text-xs text-muted-foreground">+{notes} notes</span>
               )}
-            />
-            <div className="min-w-0">
-              <p className="text-sm font-medium">{it.title}</p>
-              <p className="text-xs text-muted-foreground">{it.detail}</p>
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 text-xs font-medium text-success">
+              <HugeiconsIcon icon={CheckmarkCircle02Icon} className="size-3.5" />
+              On track
+            </span>
+          )
+        }
+        className="mb-4"
+      />
+      <div className="grid gap-2 sm:grid-cols-2">
+        {insights.slice(0, 8).map((it) => {
+          const warn = it.severity === 'warning'
+          return (
+            <div
+              key={it.id}
+              className={cn(
+                'flex gap-2.5 rounded-lg border border-l-2 px-3 py-2.5',
+                warn
+                  ? 'border-destructive/20 border-l-destructive bg-destructive/5'
+                  : 'border-border border-l-muted-foreground/40 bg-muted/30'
+              )}
+            >
+              <HugeiconsIcon
+                icon={warn ? AlertCircleIcon : InformationCircleIcon}
+                className={cn(
+                  'mt-0.5 size-4 shrink-0',
+                  warn ? 'text-destructive' : 'text-muted-foreground'
+                )}
+              />
+              <div className="min-w-0">
+                <p className="text-sm font-medium">{it.title}</p>
+                <p className="text-xs text-muted-foreground">{it.detail}</p>
+              </div>
             </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
     </div>
   )
 }
+
+const SEGMENT_COLORS = [
+  'var(--chart-1)',
+  'var(--chart-3)',
+  'var(--chart-4)',
+  'var(--chart-5)',
+  'var(--chart-2)',
+]
+const segColor = (i: number) =>
+  i < SEGMENT_COLORS.length ? SEGMENT_COLORS[i] : 'var(--muted-foreground)'
 
 function BreakdownCard({
   title,
@@ -369,35 +444,58 @@ function BreakdownCard({
   rows: { key: string; amount: number }[]
   currency: Currency
 }) {
+  const total = rows.reduce((s, r) => s + r.amount, 0)
   const top = rows.slice(0, 6)
-  const max = Math.max(1, ...top.map((r) => r.amount))
+  const rest = total - top.reduce((s, r) => s + r.amount, 0)
+  const pct = (v: number) => (total > 0 ? (v / total) * 100 : 0)
+
   return (
     <div className="rounded-2xl border border-border bg-card p-6">
-      <div className="mb-4 flex items-center gap-2">
-        <HugeiconsIcon icon={PieChartIcon} className="size-4 text-muted-foreground" />
-        <h2 className="text-sm font-semibold">{title}</h2>
-      </div>
+      <SectionHeading
+        title={title}
+        accent="muted"
+        meta={total > 0 ? formatMoney(total, currency, { compact: true }) : undefined}
+        className="mb-4"
+      />
       {top.length === 0 ? (
         <p className="py-4 text-center text-sm text-muted-foreground">No costs yet.</p>
       ) : (
-        <div className="space-y-2.5">
-          {top.map((r) => (
-            <div key={r.key} className="space-y-1">
-              <div className="flex items-center justify-between text-sm">
+        <>
+          {/* Composition bar — the proportional split at a glance. */}
+          <div className="mb-4 flex h-2 w-full overflow-hidden rounded-full bg-muted">
+            {top.map((r, i) => (
+              <div
+                key={r.key}
+                style={{ width: `${pct(r.amount)}%`, backgroundColor: segColor(i) }}
+                title={`${r.key} · ${pct(r.amount).toFixed(0)}%`}
+              />
+            ))}
+            {rest > 0.005 && (
+              <div
+                style={{ width: `${pct(rest)}%` }}
+                className="bg-muted-foreground/30"
+                title={`Other · ${pct(rest).toFixed(0)}%`}
+              />
+            )}
+          </div>
+          <div className="space-y-2">
+            {top.map((r, i) => (
+              <div key={r.key} className="flex items-center gap-2.5 text-sm">
+                <span
+                  className="size-2 shrink-0 rounded-full"
+                  style={{ backgroundColor: segColor(i) }}
+                />
                 <span className="truncate text-muted-foreground">{r.key}</span>
-                <span className="tabular-nums">
+                <span className="ml-auto shrink-0 tabular-nums">
                   {formatMoney(r.amount, currency, { compact: true })}
                 </span>
+                <span className="w-10 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
+                  {pct(r.amount).toFixed(0)}%
+                </span>
               </div>
-              <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                <div
-                  className="h-full rounded-full bg-chart-4"
-                  style={{ width: `${(r.amount / max) * 100}%` }}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        </>
       )}
     </div>
   )
