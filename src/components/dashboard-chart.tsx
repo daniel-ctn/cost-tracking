@@ -2,6 +2,8 @@
 
 import {
   ComposedChart,
+  AreaChart,
+  Area,
   Bar,
   Line,
   XAxis,
@@ -9,6 +11,7 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
+  ReferenceLine,
   ResponsiveContainer,
 } from 'recharts'
 import { formatMoney, type Currency } from '@/lib/currency'
@@ -101,6 +104,7 @@ export function DashboardChart({
           stroke="var(--border)"
           vertical={false}
         />
+        <ReferenceLine yAxisId="money" y={0} stroke="var(--border)" />
         <XAxis
           dataKey="label"
           axisLine={false}
@@ -175,6 +179,29 @@ export function DashboardChart({
           connectNulls={false}
         />
       </ComposedChart>
+    </ResponsiveContainer>
+  )
+}
+
+/** Glanceable profit trend for the dashboard hero — no axes, no chrome. */
+export function ProfitSparkline({ data }: { data: ChartPoint[] }) {
+  const positive = data.length === 0 || data[data.length - 1].profit >= 0
+  const color = positive ? 'var(--chart-1)' : 'var(--destructive)'
+  return (
+    <ResponsiveContainer width="100%" height={48}>
+      <AreaChart data={data} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
+        <ReferenceLine y={0} stroke="var(--border)" strokeDasharray="2 2" />
+        <Area
+          type="monotone"
+          dataKey="profit"
+          stroke={color}
+          strokeWidth={2}
+          fill={color}
+          fillOpacity={0.12}
+          dot={false}
+          isAnimationActive={false}
+        />
+      </AreaChart>
     </ResponsiveContainer>
   )
 }

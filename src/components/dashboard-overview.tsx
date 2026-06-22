@@ -3,12 +3,6 @@
 import { useMemo, useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
-  Dollar01Icon,
-  ReceiptTextIcon,
-  ProfitIcon,
-  PercentIcon,
-  ArrowUpRight01Icon,
-  ArrowDownRight01Icon,
   ChartHistogramIcon,
   PackageIcon,
   PieChartIcon,
@@ -17,6 +11,7 @@ import {
 } from '@hugeicons/core-free-icons'
 import { cn } from '@/lib/utils'
 import { DashboardChart, type ChartPoint } from '@/components/dashboard-chart'
+import { DashboardHero } from '@/components/dashboard-hero'
 import { formatMoney, type Currency } from '@/lib/currency'
 import type { DashboardRow, Insight, CostBreakdown } from '@/app/actions'
 
@@ -107,40 +102,8 @@ function pctChange(cur: number, prev: number): number | null {
   return ((cur - prev) / Math.abs(prev)) * 100
 }
 
-function Delta({
-  value,
-  goodWhenUp,
-  suffix = '%',
-}: {
-  value: number | null
-  goodWhenUp: boolean
-  suffix?: string
-}) {
-  if (value === null || !Number.isFinite(value)) {
-    return <span className="text-muted-foreground">No prior data</span>
-  }
-  const up = value >= 0
-  const good = up === goodWhenUp
-  return (
-    <span
-      className={cn(
-        'inline-flex items-center gap-0.5 font-medium tabular-nums',
-        Math.abs(value) < 0.05
-          ? 'text-muted-foreground'
-          : good
-            ? 'text-success'
-            : 'text-destructive'
-      )}
-    >
-      <HugeiconsIcon
-        icon={up ? ArrowUpRight01Icon : ArrowDownRight01Icon}
-        className="size-3.5"
-      />
-      {Math.abs(value).toFixed(1)}
-      {suffix}
-    </span>
-  )
-}
+const fullLabel = (i: number) =>
+  `${MONTHS[((i % 12) + 12) % 12]} ${Math.floor(i / 12)}`
 
 export function DashboardOverview({
   rows,
@@ -199,6 +162,7 @@ export function DashboardOverview({
     return {
       cur,
       curMargin,
+      anchorLabel: fullLabel(win.end),
       delta: {
         revenue: prev ? pctChange(cur.revenue, prev.revenue) : null,
         cost: prev ? pctChange(cur.cost, prev.cost) : null,
@@ -219,119 +183,44 @@ export function DashboardOverview({
         ? 'all time'
         : `last ${range === '6m' ? 6 : 12} months`
 
-  const kpis = view
-    ? [
-        {
-          key: 'revenue',
-          label: 'Revenue',
-          icon: Dollar01Icon,
-          value: fmtMoney(view.cur.revenue),
-          delta: view.delta.revenue,
-          goodWhenUp: true,
-          suffix: '%',
-          tone: 'text-chart-3 bg-chart-3/10',
-        },
-        {
-          key: 'cost',
-          label: 'Costs',
-          icon: ReceiptTextIcon,
-          value: fmtMoney(view.cur.cost),
-          delta: view.delta.cost,
-          goodWhenUp: false,
-          suffix: '%',
-          tone: 'text-destructive bg-destructive/10',
-        },
-        {
-          key: 'profit',
-          label: 'Profit',
-          icon: ProfitIcon,
-          value: fmtMoney(view.cur.profit),
-          delta: view.delta.profit,
-          goodWhenUp: true,
-          suffix: '%',
-          tone: 'text-primary bg-primary/10',
-        },
-        {
-          key: 'margin',
-          label: 'Profit margin',
-          icon: PercentIcon,
-          value: `${view.curMargin.toFixed(1)}%`,
-          delta: view.delta.margin,
-          goodWhenUp: true,
-          suffix: ' pts',
-          tone: 'text-chart-5 bg-chart-5/10',
-        },
-      ]
-    : []
-
-  return (
-    <div className="space-y-8">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+  if (!view) {
+    return (
+      <div className="space-y-8">
         <div>
           <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
             Overview
           </p>
           <h1 className="mt-1 text-3xl font-bold tracking-tight">Dashboard</h1>
         </div>
-        <div className="inline-flex w-fit items-center rounded-lg border border-border bg-card p-0.5">
-          {RANGES.map((r) => (
-            <button
-              key={r.id}
-              type="button"
-              onClick={() => setRange(r.id)}
-              className={cn(
-                'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
-                range === r.id
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-muted-foreground hover:text-foreground'
-              )}
-            >
-              {r.label}
-            </button>
-          ))}
-        </div>
+        <EmptyState />
       </div>
+    )
+  }
+
+  return (
+    <div className="space-y-8">
+      <DashboardHero
+        currency={currency}
+        ranges={RANGES}
+        range={range}
+        onRangeChange={(id) => setRange(id as RangeId)}
+        data={{
+          anchorLabel: view.anchorLabel,
+          rangeLabel,
+          hasData: view.hasData,
+          profit: view.cur.profit,
+          margin: view.curMargin,
+          revenue: view.cur.revenue,
+          cost: view.cur.cost,
+          delta: view.delta,
+          spark: view.monthly,
+        }}
+      />
 
       {insights.length > 0 && <InsightsPanel insights={insights} />}
 
-      {!view || !view.hasData ? (
-        <EmptyState />
-      ) : (
+      {view.hasData && (
         <>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {kpis.map((k) => (
-              <div
-                key={k.key}
-                className="rounded-2xl border border-border bg-card p-5"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">{k.label}</span>
-                  <span
-                    className={cn(
-                      'flex size-9 items-center justify-center rounded-xl',
-                      k.tone
-                    )}
-                  >
-                    <HugeiconsIcon icon={k.icon} className="size-4.5" />
-                  </span>
-                </div>
-                <p className="mt-3 text-2xl font-bold tracking-tight tabular-nums">
-                  {k.value}
-                </p>
-                <p className="mt-1.5 flex items-center gap-1.5 text-xs">
-                  <Delta
-                    value={k.delta}
-                    goodWhenUp={k.goodWhenUp}
-                    suffix={k.suffix}
-                  />
-                  {k.delta !== null && (
-                    <span className="text-muted-foreground">vs prev period</span>
-                  )}
-                </p>
-              </div>
-            ))}
-          </div>
-
           <div className="rounded-2xl border border-border bg-card p-6">
             <div className="mb-5 flex items-center gap-2">
               <HugeiconsIcon
