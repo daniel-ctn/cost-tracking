@@ -27,6 +27,7 @@ import {
 } from '@/components/ui/select'
 import { ToggleField } from '@/components/toggle-field'
 import { ConfirmDialog } from '@/components/confirm-dialog'
+import { PageHeader } from '@/components/page-header'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
   Add01Icon,
@@ -68,18 +69,17 @@ export function ServicesManager({
 
   return (
     <>
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-            Catalog
-          </p>
-          <h1 className="mt-1 text-3xl font-bold tracking-tight">Services</h1>
-        </div>
-        <Button onClick={() => setDialog({})}>
-          <HugeiconsIcon icon={Add01Icon} className="mr-2 size-4" />
-          Add service
-        </Button>
-      </div>
+      <PageHeader
+        eyebrow="Catalog"
+        title="Services"
+        description="Catalog the providers you pay for so costs roll up across every product."
+        action={
+          <Button onClick={() => setDialog({})}>
+            <HugeiconsIcon icon={Add01Icon} className="mr-2 size-4" />
+            Add service
+          </Button>
+        }
+      />
 
       {services.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border py-20 text-center">

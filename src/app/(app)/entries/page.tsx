@@ -8,6 +8,7 @@ import { EntriesList } from '@/components/entries-list'
 import { AddEntryButton } from '@/components/add-entry-button'
 import { ImportExportBar } from '@/components/import-export-bar'
 import { EmptyState } from '@/components/empty-state'
+import { PageHeader } from '@/components/page-header'
 import { File01Icon } from '@hugeicons/core-free-icons'
 
 export const dynamic = 'force-dynamic'
@@ -25,26 +26,23 @@ export default async function EntriesPage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-            Records
-          </p>
-          <h1 className="mt-1 text-3xl font-bold tracking-tight">
-            Monthly entries
-          </h1>
-        </div>
-        <div className="flex items-center gap-2">
-          <ImportExportBar />
-          {products.length > 0 && (
-            <AddEntryButton
-              products={products}
-              services={services}
-              currency={settings.currency}
-            />
-          )}
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="Records"
+        title="Monthly entries"
+        description="One record per product per month — the revenue earned and the costs behind it."
+        action={
+          <div className="flex items-center gap-2">
+            <ImportExportBar />
+            {products.length > 0 && (
+              <AddEntryButton
+                products={products}
+                services={services}
+                currency={settings.currency}
+              />
+            )}
+          </div>
+        }
+      />
 
       {products.length === 0 ? (
         <EmptyState

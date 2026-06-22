@@ -53,17 +53,42 @@ costs are "bad" and read as destructive in deltas.
 ## Layout patterns
 
 - **Page rhythm:** top-level page `div` uses `space-y-8`.
-- **Page header:** uppercase tracking eyebrow + `text-3xl font-bold` title.
-  ```tsx
-  <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Section</p>
-  <h1 className="mt-1 text-3xl font-bold tracking-tight">Title</h1>
-  ```
+- **Accent-tick signature:** a thin vertical `bg-primary` tick (echoing the
+  ascending-bars logo) marks both page titles and in-card section titles, so
+  screens read as one family. Always use the components below rather than
+  hand-rolling the eyebrow/title markup.
+- **Page header:** `<PageHeader eyebrow title description? action? />`
+  (`page-header.tsx`) — accent tick + uppercase eyebrow + `text-3xl` title, an
+  optional one-line purpose description, and an optional right-aligned CTA.
+- **Section header:** `<SectionHeading eyebrow? title meta? accent? />`
+  (`section-heading.tsx`) — the in-card counterpart. `accent` is state-aware
+  (`destructive` when a panel has warnings, `muted` for secondary panels).
 - **Card / panel:** `rounded-2xl border border-border bg-card p-6` (tables use
-  `overflow-hidden` and no padding).
+  `overflow-hidden` and no padding). The dashboard hero is a larger
+  `rounded-3xl` panel.
 - **Content width:** `max-w-6xl mx-auto` (set in the layout).
+
+## Navigation & app shell
+
+- **Top command bar, not a sidebar.** With six sections this is a personal-tool
+  bar; a sidebar would be overkill. The header (`(app)/layout.tsx`) is sticky +
+  `backdrop-blur`, holds logo, `main-nav`, a contextual currency chip linking to
+  settings, theme toggle, and the user menu.
+- **Active nav** uses a brand-tinted pill (`bg-primary/10 text-primary`), and a
+  hairline divider separates Dashboard (the read view) from the management
+  group. Spacing tightens on mobile so the bar never overflows.
+
+## Dashboard
+
+- Opens with a **cockpit hero** (`dashboard-hero.tsx`): headline net profit +
+  profit sparkline, a bespoke SVG **margin-health gauge** (Healthy / Thin /
+  Loss), and revenue/costs as supporting stats — not four identical KPI cards.
+- Modules are purpose-shaped: a "Needs attention" signal stream, a ranked
+  profit **leaderboard**, and cost **composition** breakdowns (share %).
 
 ## Shared components
 
+- `page-header.tsx` / `section-heading.tsx` — the accent-tick title signatures.
 - `empty-state.tsx` — dashed-border empty state (icon, title, description, optional action).
 - `confirm-dialog.tsx` — reusable destructive confirmation dialog.
 - `main-nav.tsx` — header nav with `aria-current` active styling.

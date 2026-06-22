@@ -26,6 +26,7 @@ import {
   SelectTrigger,
 } from '@/components/ui/select'
 import { ToggleField } from '@/components/toggle-field'
+import { PageHeader } from '@/components/page-header'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { EmptyState } from '@/components/empty-state'
 import { HugeiconsIcon } from '@hugeicons/react'
@@ -74,20 +75,19 @@ export function TemplatesManager({
 
   return (
     <>
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-            Recurring
-          </p>
-          <h1 className="mt-1 text-3xl font-bold tracking-tight">Templates</h1>
-        </div>
-        {products.length > 0 && (
-          <Button onClick={() => setDialog({})}>
-            <HugeiconsIcon icon={Add01Icon} className="mr-2 size-4" />
-            Add template
-          </Button>
-        )}
-      </div>
+      <PageHeader
+        eyebrow="Recurring"
+        title="Templates"
+        description="Recurring expected costs that prefill a new month's entry in one click."
+        action={
+          products.length > 0 ? (
+            <Button onClick={() => setDialog({})}>
+              <HugeiconsIcon icon={Add01Icon} className="mr-2 size-4" />
+              Add template
+            </Button>
+          ) : undefined
+        }
+      />
 
       {products.length === 0 ? (
         <EmptyState

@@ -3,6 +3,7 @@ import { getSessionUser } from '@/lib/auth-helpers'
 import { getUserSettings } from '@/app/actions'
 import { ChangePasswordForm } from '@/components/change-password-form'
 import { AccountSettingsForm } from '@/components/account-settings-form'
+import { PageHeader } from '@/components/page-header'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { UserCircleIcon } from '@hugeicons/core-free-icons'
 
@@ -15,12 +16,11 @@ export default async function AccountPage() {
 
   return (
     <div className="mx-auto max-w-xl space-y-8">
-      <div>
-        <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-          Settings
-        </p>
-        <h1 className="mt-1 text-3xl font-bold tracking-tight">Account</h1>
-      </div>
+      <PageHeader
+        eyebrow="Settings"
+        title="Account"
+        description="Your display currency, monthly budget, and password."
+      />
 
       <div className="rounded-2xl border border-border bg-card p-6">
         <div className="flex items-center gap-3">
